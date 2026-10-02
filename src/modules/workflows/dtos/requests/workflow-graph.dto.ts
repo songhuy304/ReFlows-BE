@@ -3,11 +3,22 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsNotEmpty,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
   ValidateNested,
 } from 'class-validator';
+
+export class WorkflowPositionDto {
+  @ApiProperty({ example: 0 })
+  @IsNumber()
+  x: number;
+
+  @ApiProperty({ example: 0 })
+  @IsNumber()
+  y: number;
+}
 
 export class WorkflowNodeDto {
   @ApiProperty({ example: 'node-1' })
@@ -19,6 +30,15 @@ export class WorkflowNodeDto {
   @IsString()
   @IsOptional()
   type?: string;
+
+  @ApiPropertyOptional({
+    type: WorkflowPositionDto,
+    description: 'Omitted for nodes that have not been placed yet.',
+  })
+  @ValidateNested()
+  @Type(() => WorkflowPositionDto)
+  @IsOptional()
+  position?: WorkflowPositionDto;
 
   @ApiProperty({ example: { label: 'Start' } })
   @IsObject()

@@ -39,10 +39,13 @@ export class WorkflowAgentService {
       { responseFormat: 'json', temperature: 0.2 },
     );
 
-    return this.parseOutput(response.content);
+    return this.parseOutput(response.content, graph);
   }
 
-  private parseOutput(content: string): WorkflowChatResponseDto {
+  private parseOutput(
+    content: string,
+    currentGraph: WorkflowGraph,
+  ): WorkflowChatResponseDto {
     const output = this.parseJson(content);
 
     if (typeof output.reply !== 'string' || !output.reply.trim()) {
@@ -53,7 +56,10 @@ export class WorkflowAgentService {
       return { reply: output.reply, graph: null };
     }
 
-    return { reply: output.reply, graph: this.toGraph(output.graph, content) };
+    return {
+      reply: output.reply,
+      graph: this.toGraph(output.graph, content, currentGraph),
+    };
   }
 
   private parseJson(content: string): WorkflowAgentOutput {
@@ -73,7 +79,11 @@ export class WorkflowAgentService {
     }
   }
 
-  private toGraph(raw: unknown, content: string): WorkflowGraph {
+  private toGraph(
+    raw: unknown,
+    content: string,
+    currentGraph: WorkflowGraph,
+  ): WorkflowGraph {
     const dto = plainToInstance(WorkflowGraphDto, raw);
     const errors = validateSync(dto, { whitelist: true });
 
@@ -109,12 +119,23 @@ export class WorkflowAgentService {
       edgeIds.add(edge.id);
     }
 
+    const currentPositions = new Map(
+      currentGraph.nodes
+        .filter((node) => node.position)
+        .map((node) => [node.id, node.position]),
+    );
+
     return {
-      nodes: dto.nodes.map((node) => ({
-        id: node.id,
-        type: WORKFLOW_NODE_TYPE,
-        data: { label: node.data.label, shape: node.data.shape },
-      })),
+      nodes: dto.nodes.map((node) => {
+        const position = currentPositions.get(node.id);
+
+        return {
+          id: node.id,
+          type: WORKFLOW_NODE_TYPE,
+          ...(position && { position }),
+          data: { label: node.data.label, shape: node.data.shape },
+        };
+      }),
       edges: dto.edges.map((edge) => ({
         id: edge.id,
         source: edge.source,

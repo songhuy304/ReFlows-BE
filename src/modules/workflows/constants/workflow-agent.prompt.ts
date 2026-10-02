@@ -5,6 +5,11 @@ export const WORKFLOW_NODE_TYPE = 'shape';
 export const WORKFLOW_EDGE_TYPE = 'labeled';
 
 export function buildWorkflowAgentPrompt(graph: WorkflowGraph): string {
+  const promptGraph: WorkflowGraph = {
+    nodes: graph.nodes.map(({ position: _position, ...node }) => node),
+    edges: graph.edges,
+  };
+
   return `You are a workflow design assistant for RecruitHub, a recruitment platform.
 You help users build, explain and improve workflows drawn as flowcharts.
 
@@ -27,7 +32,7 @@ Shape must be one of:
 - Do not include positions or coordinates; the client lays out the graph.
 
 # Current graph
-${JSON.stringify(graph)}
+${JSON.stringify(promptGraph)}
 
 # Response
 Respond with a single JSON object and nothing else:

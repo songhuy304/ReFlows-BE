@@ -12,6 +12,10 @@ import { EWorkflowStatus } from '@/modules/workflows/enums/workflow-status.enum'
 export interface WorkflowNode {
   id: string;
   type?: string;
+  position?: {
+    x: number;
+    y: number;
+  };
   data: Record<string, unknown>;
 }
 
