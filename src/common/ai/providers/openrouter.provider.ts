@@ -1,5 +1,5 @@
-import { BadRequestException } from '@/common/filters';
-import { Injectable } from '@nestjs/common';
+import { BadGatewayException, BadRequestException } from '@/common/filters';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   AiChatOptions,
@@ -12,6 +12,8 @@ import {
 @Injectable()
 export class OpenRouterProvider implements AiProvider {
   readonly name = AiProviderName.OPEN_ROUTER;
+
+  private readonly logger = new Logger(OpenRouterProvider.name);
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -52,9 +54,18 @@ export class OpenRouterProvider implements AiProvider {
     }
 
     const data = await response.json();
+    const choice = data.choices?.[0];
+    const content: unknown = choice?.message?.content;
+
+    if (typeof content !== 'string' || !content.trim()) {
+      this.logger.warn(
+        `Empty AI response (model: ${data.model}, finish_reason: ${choice?.finish_reason}, error: ${JSON.stringify(data.error ?? choice?.error)})`,
+      );
+      throw new BadGatewayException('AI provider returned empty response');
+    }
 
     return {
-      content: data.choices[0].message.content,
+      content,
       model: data.model,
       usage: data.usage
         ? {
