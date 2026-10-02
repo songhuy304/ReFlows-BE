@@ -1,0 +1,16 @@
+export enum NotificationType {
+    NEW_NOTIFICATION = "NEW_NOTIFICATION",
+
+    INVITED_TO_TEAM = "INVITED_TO_TEAM",
+    JOINED_TEAM = "JOINED_TEAM",
+    LEFT_TEAM = "LEFT_TEAM",
+    MEMBER_JOINED_TEAM = "MEMBER_JOINED_TEAM",
+    MEMBER_LEFT_TEAM = "MEMBER_LEFT_TEAM",
+    TEAM_JOIN_REQUEST_APPROVED = 'TEAM_JOIN_REQUEST_APPROVED',
+    TEAM_JOIN_REQUEST_REJECTED = 'TEAM_JOIN_REQUEST_REJECTED',
+}
+
+export interface NotificationPayload<T> {
+    type: NotificationType;
+    data: T;
+}
