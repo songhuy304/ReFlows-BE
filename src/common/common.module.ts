@@ -9,6 +9,7 @@ import { GuardModule } from './guard/guard.module';
 import { UploadModule } from './upload/upload.module';
 import { BullMqModule } from './bullmq/bullmq.module';
 import { CacheModule } from './cache/cache.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { CacheModule } from './cache/cache.module';
     HelperModule,
     CacheModule,
     UploadModule,
+    AiModule,
     BullMqModule,
   ],
   exports: [DatabaseModule, CacheModule, BullMqModule],

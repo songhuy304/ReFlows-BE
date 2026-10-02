@@ -17,7 +17,9 @@ import { ApiTags } from '@nestjs/swagger';
 import { CreateWorkflowDto } from '../dtos/requests/workflow.create.dto';
 import { UpdateWorkflowDto } from '../dtos/requests/workflow.update.dto';
 import { WorkflowRequestDto } from '../dtos/requests/workflow.get.dto';
+import { WorkflowChatDto } from '../dtos/requests/workflow.chat.dto';
 import { WorkflowResponseDto } from '../dtos/responses/workflow.response.dto';
+import { WorkflowChatResponseDto } from '../dtos/responses/workflow.chat.response.dto';
 import { WorkflowService } from '../services/workflow.service';
 
 @ApiTags('Workflows')
@@ -74,6 +76,22 @@ export class WorkflowController {
     @AuthUser() user: IAuthUser,
   ) {
     return this.workflowService.updateWorkflow(id, payload, user);
+  }
+
+  @Post(':id/chat')
+  @ApiEndpoint({
+    summary: 'Chat with AI agent to generate or edit the workflow graph',
+    description:
+      'Stateless: send the full chat history each time. The returned graph is a preview and is not saved.',
+    httpStatus: HttpStatus.OK,
+    serialization: WorkflowChatResponseDto,
+  })
+  chatWithAgent(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() payload: WorkflowChatDto,
+    @AuthUser() user: IAuthUser,
+  ) {
+    return this.workflowService.chatWithAgent(id, payload, user);
   }
 
   @Delete(':id')

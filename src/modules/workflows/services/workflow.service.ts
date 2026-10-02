@@ -3,6 +3,7 @@ import { FindOptionsWhere, ILike } from 'typeorm';
 import { WorkflowEntity } from '@/common/database/entities';
 import { ERROR_CODE } from '@/common/filters';
 import {
+  BadRequestException,
   ForbiddenException,
   NotFoundException,
 } from '@/common/filters/exception';
@@ -17,13 +18,19 @@ import { WorkflowRepositoryImpl } from '../repositories/workflow.repository';
 import { CreateWorkflowDto } from '../dtos/requests/workflow.create.dto';
 import { UpdateWorkflowDto } from '../dtos/requests/workflow.update.dto';
 import { WorkflowRequestDto } from '../dtos/requests/workflow.get.dto';
+import { WorkflowChatDto } from '../dtos/requests/workflow.chat.dto';
 import { WorkflowResponseDto } from '../dtos/responses/workflow.response.dto';
+import { WorkflowChatResponseDto } from '../dtos/responses/workflow.chat.response.dto';
 import { WorkflowMapper } from '../mappers/workflow.mapper';
 import { EWorkflowStatus } from '../enums';
+import { WorkflowAgentService } from './workflow-agent.service';
 
 @Injectable()
 export class WorkflowService {
-  constructor(private readonly workflowRepository: WorkflowRepositoryImpl) {}
+  constructor(
+    private readonly workflowRepository: WorkflowRepositoryImpl,
+    private readonly workflowAgentService: WorkflowAgentService,
+  ) {}
 
   async createWorkflow(
     payload: CreateWorkflowDto,
@@ -100,6 +107,27 @@ export class WorkflowService {
     const workflow = await this.findOwnedWorkflow(id, authUser);
     await this.workflowRepository.softRemove(workflow.id);
     return ApiGenericResponseDto.success('Workflow deleted successfully');
+  }
+
+  async chatWithAgent(
+    id: number,
+    payload: WorkflowChatDto,
+    authUser: IAuthUser,
+  ): Promise<ApiResponseDto<WorkflowChatResponseDto>> {
+    const workflow = await this.findOwnedWorkflow(id, authUser);
+
+    if (payload.messages.at(-1)?.role !== 'user') {
+      throw new BadRequestException(
+        ERROR_CODE.WORKFLOW_CHAT_LAST_MESSAGE_NOT_USER,
+      );
+    }
+
+    const result = await this.workflowAgentService.chat(
+      payload.graph ?? workflow.graph,
+      payload.messages,
+    );
+
+    return ApiResponseDto.success(result);
   }
 
   private async findOwnedWorkflow(

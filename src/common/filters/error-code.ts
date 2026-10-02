@@ -14,4 +14,7 @@ export const ERROR_CODE = {
 
   WORKFLOW_NOT_FOUND: 'error.workflow.not-found',
   WORKFLOW_FORBIDDEN: 'error.workflow.forbidden',
+  WORKFLOW_CHAT_LAST_MESSAGE_NOT_USER:
+    'error.workflow.chat-last-message-not-user',
+  WORKFLOW_AI_INVALID_RESPONSE: 'error.workflow.ai-invalid-response',
 };

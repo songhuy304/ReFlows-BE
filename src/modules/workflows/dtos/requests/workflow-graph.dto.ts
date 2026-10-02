@@ -3,36 +3,11 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsNotEmpty,
-  IsNumber,
   IsObject,
   IsOptional,
   IsString,
   ValidateNested,
 } from 'class-validator';
-
-export class WorkflowPositionDto {
-  @ApiProperty({ example: 0 })
-  @IsNumber()
-  x: number;
-
-  @ApiProperty({ example: 0 })
-  @IsNumber()
-  y: number;
-}
-
-export class WorkflowViewportDto {
-  @ApiProperty({ example: 0 })
-  @IsNumber()
-  x: number;
-
-  @ApiProperty({ example: 0 })
-  @IsNumber()
-  y: number;
-
-  @ApiProperty({ example: 1 })
-  @IsNumber()
-  zoom: number;
-}
 
 export class WorkflowNodeDto {
   @ApiProperty({ example: 'node-1' })
@@ -44,11 +19,6 @@ export class WorkflowNodeDto {
   @IsString()
   @IsOptional()
   type?: string;
-
-  @ApiProperty({ type: WorkflowPositionDto })
-  @ValidateNested()
-  @Type(() => WorkflowPositionDto)
-  position: WorkflowPositionDto;
 
   @ApiProperty({ example: { label: 'Start' } })
   @IsObject()
@@ -94,9 +64,4 @@ export class WorkflowGraphDto {
   @ValidateNested({ each: true })
   @Type(() => WorkflowEdgeDto)
   edges: WorkflowEdgeDto[];
-
-  @ApiProperty({ type: WorkflowViewportDto })
-  @ValidateNested()
-  @Type(() => WorkflowViewportDto)
-  viewport: WorkflowViewportDto;
 }

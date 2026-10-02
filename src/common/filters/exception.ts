@@ -18,6 +18,12 @@ export class ForbiddenException extends HttpException {
   }
 }
 
+export class BadGatewayException extends HttpException {
+  constructor(message?: string) {
+    super(message || 'Bad Gateway', HttpStatus.BAD_GATEWAY);
+  }
+}
+
 export class UnauthorizedException extends HttpException {
   constructor(message?: string) {
     super(message || 'Unauthorized', HttpStatus.UNAUTHORIZED);

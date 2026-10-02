@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Expose } from 'class-transformer';
-import { WorkflowGraph } from '@/common/database/entities';
+import { Expose, Transform } from 'class-transformer';
+import { WorkflowEntity, WorkflowGraph } from '@/common/database/entities';
 import { EWorkflowStatus } from '../../enums';
 import { WorkflowGraphDto } from '../requests/workflow-graph.dto';
 
@@ -23,6 +23,7 @@ export class WorkflowResponseDto {
 
   @ApiProperty({ type: WorkflowGraphDto })
   @Expose()
+  @Transform(({ obj }: { obj: WorkflowEntity }) => obj.graph)
   graph: WorkflowGraph;
 
   @ApiProperty({ example: 10 })
