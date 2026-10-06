@@ -56,6 +56,8 @@ interface WorkflowEdge {
 }
 ```
 
+Với graph do AI sinh, `data` chỉ xuất hiện khi edge có label thật. Label rỗng bị BE loại bỏ, nên FE luôn đọc qua `edge.data?.label`.
+
 Ý nghĩa shape (AI cũng dùng quy ước này):
 
 | Shape | Ý nghĩa |
@@ -197,6 +199,20 @@ Graph AI trả về đã được BE kiểm tra: id node/edge không trùng, edg
 - Node giữ nguyên id so với `graph` gửi lên → BE gắn lại `position` cũ, user không mất bố cục.
 - Node mới AI thêm → không có `position`, FE auto-layout node đó.
 
+#### Thời gian phản hồi & timeout
+
+BE gọi Groq (`openai/gpt-oss-120b`) làm provider chính, nếu lỗi thì tự fallback sang OpenRouter. Mỗi provider có timeout riêng (`GROQ_TIMEOUT_MS` / `OPENROUTER_TIMEOUT_MS`, mặc định 60s) và chạy **nối tiếp**:
+
+| Trường hợp | Thời gian |
+| --- | --- |
+| Groq trả về bình thường | 1–2.5s |
+| Groq lỗi/timeout → OpenRouter trả về | tới 62s |
+| Cả hai timeout | tới 120s |
+
+FE phải đặt timeout client **lớn hơn 120s** (ví dụ `AbortSignal.timeout(130_000)`), nếu không sẽ abort đúng lúc fallback đang chạy và mất luôn request có thể thành công. Muốn rút ngắn thì giảm hai biến env về `25000`, khi đó worst case ~50s và FE đặt 60s là đủ.
+
+Vì p50 chỉ ~2s, FE cứ hiển thị loading thường và chỉ cần chịu được worst case, không nên tối ưu UI cho 120s.
+
 Ví dụ:
 
 ```json
@@ -240,14 +256,20 @@ Ví dụ:
 
 ## 3. Error codes
 
-| HTTP | `message` | Khi nào |
-| --- | --- | --- |
-| 400 | mảng lỗi validate | Body/query sai format |
-| 400 | `error.workflow.chat-last-message-not-user` | Tin nhắn cuối trong `messages` không phải `user` |
-| 400 | `AI provider request failed` | Gọi AI provider thất bại (hết quota, sai key, timeout...) |
-| 403 | `error.workflow.forbidden` | Workflow không thuộc user hiện tại |
-| 404 | `error.workflow.not-found` | Không tìm thấy workflow (hoặc đã xoá) |
-| 502 | `error.workflow.ai-invalid-response` | AI trả JSON hỏng / graph không hợp lệ, FE cho user thử lại |
+| HTTP | `message` | Khi nào | Cho retry |
+| --- | --- | --- | --- |
+| 400 | mảng lỗi validate | Body/query sai format | Không |
+| 400 | `error.workflow.chat-last-message-not-user` | Tin nhắn cuối trong `messages` không phải `user` | Không, bug FE |
+| 403 | `error.workflow.forbidden` | Workflow không thuộc user hiện tại | Không |
+| 404 | `error.workflow.not-found` | Không tìm thấy workflow (hoặc đã xoá) | Không |
+| 502 | `error.workflow.ai-invalid-response` | AI trả JSON hỏng / graph không hợp lệ | Có |
+| 502 | `error.ai.provider-failed` | Provider trả lỗi (hết quota, sai key, 5xx) sau khi đã thử cả fallback | Có |
+| 502 | `error.ai.provider-timeout` | Hết timeout trước khi provider trả về | Có |
+| 502 | `error.ai.provider-empty-response` | Provider trả response rỗng | Có |
+
+Bốn lỗi 502 đều là lỗi tạm thời của AI chứ không phải lỗi dữ liệu user, nên FE giữ lại nội dung tin nhắn và hiện nút "Thử lại". Gộp chung một message là đủ cho user ("AI đang không phản hồi, thử lại giúp mình nhé"), phân biệt chi tiết chỉ cần cho log.
+
+Lưu ý: ba code `error.ai.*` đã thay thế message `AI provider request failed` (400) ở phiên bản trước. Lỗi provider giờ luôn là 502 vì đó là lỗi upstream, không phải lỗi request của FE.
 
 ---
 
@@ -288,6 +310,13 @@ User mở chat panel (AgentChatTrigger) → gõ prompt
 ```
 
 ```ts
+const RETRYABLE = new Set([
+  'error.workflow.ai-invalid-response',
+  'error.ai.provider-failed',
+  'error.ai.provider-timeout',
+  'error.ai.provider-empty-response',
+]);
+
 const [messages, setMessages] = useState<ChatMessage[]>([]);
 
 async function sendMessage(content: string) {
@@ -295,10 +324,11 @@ async function sendMessage(content: string) {
   setMessages(next);
 
   try {
-    const { data } = await api.post(`/workflows/${id}/chat`, {
-      messages: next,
-      graph: toWorkflowGraph(nodes, edges),
-    });
+    const { data } = await api.post(
+      `/workflows/${id}/chat`,
+      { messages: next, graph: toWorkflowGraph(nodes, edges) },
+      { timeout: 130_000 }, // phải > tổng timeout của provider chính + fallback
+    );
 
     setMessages([...next, { role: 'assistant', content: data.reply }]);
 
@@ -309,8 +339,11 @@ async function sendMessage(content: string) {
       setDirty(true);
     }
   } catch (error) {
-    // 502 error.workflow.ai-invalid-response → toast "AI trả kết quả lỗi, thử lại"
-    // giữ tin nhắn user để user bấm gửi lại
+    const code = error.response?.data?.message;
+
+    // Giữ lại tin nhắn user (không rollback `next`) để user bấm gửi lại.
+    setRetryable(RETRYABLE.has(code));
+    toast(RETRYABLE.has(code) ? 'AI đang không phản hồi, thử lại giúp mình nhé' : mapError(code));
   }
 }
 ```
@@ -319,7 +352,8 @@ Lưu ý:
 
 - `messages` tối đa 20 phần tử, FE cắt bớt tin cũ (`slice(-20)`).
 - Luôn gửi `graph` đang trên canvas để AI sửa đúng bản user đang thấy, kể cả khi user đã kéo/sửa tay mà chưa save.
-- Request AI có thể mất vài giây, nên disable input + hiển thị loading.
+- Request AI thường mất 1–2.5s, nên disable input + hiển thị loading. Xem bảng timeout ở §2.6 cho worst case.
+- Response lỗi dùng format `{ statusCode, message }` của Nest, **không** bọc `{ success, data }`. Đừng đọc `data.reply` khi request fail.
 
 Helper phía FE:
 
