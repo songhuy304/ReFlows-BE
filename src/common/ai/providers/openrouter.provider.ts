@@ -1,79 +1,40 @@
-import { BadGatewayException, BadRequestException } from '@/common/filters';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AiChatOptions, AiProviderName } from '../interfaces';
 import {
-  AiChatOptions,
-  AiMessage,
-  AiProvider,
-  AiProviderName,
-  AiResponse,
-} from '../interfaces';
+  OpenAiCompatibleConfig,
+  OpenAiCompatibleProvider,
+} from './openai-compatible.provider';
 
 @Injectable()
-export class OpenRouterProvider implements AiProvider {
+export class OpenRouterProvider extends OpenAiCompatibleProvider {
   readonly name = AiProviderName.OPEN_ROUTER;
 
-  private readonly logger = new Logger(OpenRouterProvider.name);
+  protected readonly url = 'https://openrouter.ai/api/v1/chat/completions';
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) {
+    super();
+  }
 
-  async chat(
-    messages: AiMessage[],
-    options?: AiChatOptions,
-  ): Promise<AiResponse> {
-    const response = await fetch(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.configService.getOrThrow<string>(
-            'ai.openRouter.apiKey',
-          )}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model:
-            options?.model ??
-            this.configService.getOrThrow<string>('ai.openRouter.model'),
-
-          messages,
-
-          temperature: options?.temperature ?? 0.7,
-
-          ...(options?.responseFormat === 'json' && {
-            response_format: {
-              type: 'json_object',
-            },
-          }),
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      throw new BadRequestException('AI provider request failed');
-    }
-
-    const data = await response.json();
-    const choice = data.choices?.[0];
-    const content: unknown = choice?.message?.content;
-
-    if (typeof content !== 'string' || !content.trim()) {
-      this.logger.warn(
-        `Empty AI response (model: ${data.model}, finish_reason: ${choice?.finish_reason}, error: ${JSON.stringify(data.error ?? choice?.error)})`,
-      );
-      throw new BadGatewayException('AI provider returned empty response');
-    }
-
+  protected resolveConfig(): OpenAiCompatibleConfig {
     return {
-      content,
-      model: data.model,
-      usage: data.usage
-        ? {
-            promptTokens: data.usage.prompt_tokens,
-            completionTokens: data.usage.completion_tokens,
-            totalTokens: data.usage.total_tokens,
-          }
-        : undefined,
+      apiKey: this.configService.getOrThrow<string>('ai.openRouter.apiKey'),
+      model: this.configService.getOrThrow<string>('ai.openRouter.model'),
+      timeoutMs: this.configService.getOrThrow<number>(
+        'ai.openRouter.timeoutMs',
+      ),
     };
+  }
+
+  protected buildExtraBody(
+    options?: AiChatOptions,
+  ): Record<string, unknown> {
+    // Without this, OpenRouter may route to a provider that silently ignores
+    // response_format and returns free-form text.
+    if (options?.jsonSchema || options?.responseFormat === 'json') {
+      return { provider: { require_parameters: true } };
+    }
+
+    return {};
   }
 }

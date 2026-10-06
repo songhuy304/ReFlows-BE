@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   AI_PROVIDERS,
@@ -11,6 +11,8 @@ import {
 
 @Injectable()
 export class AiService {
+  private readonly logger = new Logger(AiService.name);
+
   private readonly providers: Map<AiProviderName, AiProvider>;
 
   constructor(
@@ -22,8 +24,49 @@ export class AiService {
     );
   }
 
-  chat(messages: AiMessage[], options?: AiChatOptions): Promise<AiResponse> {
-    return this.resolveProvider(options?.provider).chat(messages, options);
+  async chat(
+    messages: AiMessage[],
+    options?: AiChatOptions,
+  ): Promise<AiResponse> {
+    const primary = this.resolveProvider(options?.provider);
+
+    try {
+      return await primary.chat(messages, options);
+    } catch (error) {
+      const fallback = this.resolveFallback(options, primary.name);
+
+      if (!fallback) {
+        throw error;
+      }
+
+      this.logger.warn(
+        `AI provider "${primary.name}" failed, falling back to "${fallback.name}": ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+
+      return fallback.chat(messages, { ...options, provider: fallback.name });
+    }
+  }
+
+  private resolveFallback(
+    options: AiChatOptions | undefined,
+    primaryName: AiProviderName,
+  ): AiProvider | undefined {
+    // An explicitly requested provider must not be silently swapped.
+    if (options?.provider) {
+      return undefined;
+    }
+
+    const fallbackName = this.configService.get<AiProviderName>(
+      'ai.fallbackProvider',
+    );
+
+    if (!fallbackName || fallbackName === primaryName) {
+      return undefined;
+    }
+
+    return this.providers.get(fallbackName);
   }
 
   private resolveProvider(name?: AiProviderName): AiProvider {

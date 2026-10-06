@@ -17,4 +17,8 @@ export const ERROR_CODE = {
   WORKFLOW_CHAT_LAST_MESSAGE_NOT_USER:
     'error.workflow.chat-last-message-not-user',
   WORKFLOW_AI_INVALID_RESPONSE: 'error.workflow.ai-invalid-response',
+
+  AI_PROVIDER_FAILED: 'error.ai.provider-failed',
+  AI_PROVIDER_TIMEOUT: 'error.ai.provider-timeout',
+  AI_PROVIDER_EMPTY_RESPONSE: 'error.ai.provider-empty-response',
 };

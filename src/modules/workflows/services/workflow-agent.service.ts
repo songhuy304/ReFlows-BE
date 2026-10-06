@@ -9,6 +9,7 @@ import {
   WORKFLOW_EDGE_TYPE,
   WORKFLOW_NODE_TYPE,
 } from '../constants/workflow-agent.prompt';
+import { WORKFLOW_AGENT_JSON_SCHEMA } from '../constants/workflow-agent.schema';
 import { WorkflowGraphDto } from '../dtos/requests/workflow-graph.dto';
 import { WorkflowChatMessageDto } from '../dtos/requests/workflow.chat.dto';
 import { WorkflowChatResponseDto } from '../dtos/responses/workflow.chat.response.dto';
@@ -36,7 +37,11 @@ export class WorkflowAgentService {
         { role: 'system', content: buildWorkflowAgentPrompt(graph) },
         ...messages,
       ],
-      { responseFormat: 'json', temperature: 0.2 },
+      {
+        responseFormat: 'json',
+        jsonSchema: WORKFLOW_AGENT_JSON_SCHEMA,
+        temperature: 0.2,
+      },
     );
 
     return this.parseOutput(response.content, graph);
@@ -141,9 +146,10 @@ export class WorkflowAgentService {
         source: edge.source,
         target: edge.target,
         type: WORKFLOW_EDGE_TYPE,
-        ...(typeof edge.data?.label === 'string' && {
-          data: { label: edge.data.label },
-        }),
+        ...(typeof edge.data?.label === 'string' &&
+          edge.data.label.trim() && {
+            data: { label: edge.data.label },
+          }),
       })),
     };
   }
