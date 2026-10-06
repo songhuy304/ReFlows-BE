@@ -65,8 +65,10 @@ Với graph do AI sinh, `data` chỉ xuất hiện khi edge có label thật. La
 | `circle` | Bắt đầu / kết thúc |
 | `rounded` | Hành động |
 | `rectangle` | Bước / trạng thái chung |
-| `diamond` | Điều kiện, edge đi ra có label `Yes` / `No` |
+| `diamond` | Điều kiện, edge đi ra có label nhánh (`Có` / `Không`, `Yes` / `No`, ...) |
 | `text` | Ghi chú, không nối edge |
+
+Graph do AI sinh phải **liên thông**: mọi node (trừ `text`) nằm trên ít nhất một edge. Node mồ côi bị FE auto-layout thành một hàng rời, không nối. AI cũng được instruct giữ DAG — nhánh "quay về bước N" ghi trong nhãn node lỗi, không vẽ mũi tên ngược — vì cycle làm line đè nhau.
 
 ### Response envelope
 
@@ -192,7 +194,7 @@ Response 200:
 }
 ```
 
-Graph AI trả về đã được BE kiểm tra: id node/edge không trùng, edge không trỏ tới node không tồn tại, `shape` hợp lệ, node có `type: 'shape'`, edge có `type: 'labeled'`.
+Graph AI trả về đã được BE kiểm tra: id node/edge không trùng, edge không trỏ tới node không tồn tại, `shape` hợp lệ, node có `type: 'shape'`, edge có `type: 'labeled'`, graph liên thông (không node mồ côi), diamond có ≥ 2 edge ra đã gắn label, node không phải diamond không được fork.
 
 `position` trong graph AI trả về:
 
